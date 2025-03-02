@@ -100,6 +100,44 @@ function merge_query_params($signed_url, $original_url)
     return $parsed_signed_url['scheme'] . '://' . $parsed_signed_url['host'] . $parsed_signed_url['path'] . '?' . $query_string;
 }
 
+
+/**
+ * Check if a URL is already a valid S3 signed URL
+ *
+ * @param string $url The URL to check
+ * @return bool True if the URL is already a signed URL, false otherwise
+ */
+function is_signed_url($url)
+{
+    // Parameter kunci yang biasanya ada di signed URL S3
+    $s3_signature_params = [
+        'X-Amz-Signature',
+        'X-Amz-Algorithm',
+        'X-Amz-Credential',
+        'X-Amz-Date',
+        'X-Amz-Expires',
+        'X-Amz-SignedHeaders',
+    ];
+
+    $parsed_url = parse_url($url);
+    if (empty($parsed_url['query'])) {
+        return false; // Tidak ada query parameters, bukan signed URL
+    }
+
+    parse_str($parsed_url['query'], $query_params);
+
+    // Periksa apakah semua parameter kunci ada di query
+    foreach ($s3_signature_params as $param) {
+        if (!isset($query_params[$param])) {
+            return false; // Parameter kunci tidak ditemukan, bukan signed URL
+        }
+    }
+
+    return true; // Semua parameter kunci ditemukan, URL sudah signed
+}
+
+
+
 /**
  * Filter URL gambar yang mengarah ke /wp-content/uploads/
  *
@@ -120,6 +158,11 @@ function replace_image_urls_with_signed($content)
 
     return preg_replace_callback($pattern, function ($matches) use ($s3_domain, $cdn_domain) {
         $original_url = $matches[0];
+
+        // Jika URL sudah merupakan signed URL yang valid, biarkan saja
+        if (is_signed_url($original_url)) {
+            return $original_url;
+        }
 
         // Pisahkan path file dari query parameters (jika ada)
         $url_parts = parse_url($original_url);
