@@ -3,7 +3,7 @@
 /**
  * Plugin Name: S3 Signed URL Replacer
  * Description: Mengganti URL gambar di /wp-content/uploads/ dengan signed URL dari Amazon S3.
- * Version: 1.1
+ * Version: 1.0
  * Author: Thoriq_Hrz
  */
 
@@ -11,54 +11,65 @@ if (!defined('ABSPATH')) {
     exit; // Mencegah akses langsung ke file
 }
 
+// Pastikan AWS SDK tersedia
 require_once __DIR__ . '/vendor/autoload.php';
+
 
 use Aws\S3\S3Client;
 use Aws\Exception\AwsException;
 
-/**
- * Ambil konfigurasi AWS dari environment variable atau constant
- */
-function get_aws_settings()
+function get_as3cf_settings()
 {
+    $settings = defined('AS3CF_SETTINGS') ? unserialize(AS3CF_SETTINGS) : [];
+
     return [
-        'access_key' => getenv('AWS_ACCESS_KEY_ID') ?: (defined('AWS_ACCESS_KEY_ID') ? AWS_ACCESS_KEY_ID : ''),
-        'secret_key' => getenv('AWS_SECRET_ACCESS_KEY') ?: (defined('AWS_SECRET_ACCESS_KEY') ? AWS_SECRET_ACCESS_KEY : ''),
-        'bucket'     => 'bucket-pbdnews',
-        'region'     => 'ap-southeast-1',
+        'provider'      => $settings['provider'] ?? '',
+        'access_key'    => $settings['access-key-id'] ?? '',
+        'secret_key'    => $settings['secret-access-key'] ?? '',
     ];
 }
 
 /**
- * Generate Signed URL untuk file di Amazon S3
+ * Generate Signed URL for Amazon S3
  *
  * @param string $file_path Path file dalam bucket S3
- * @return string Signed URL atau pesan error
+ * @return string Signed URL
  */
 function generate_signed_url($file_path)
 {
-    $settings = get_aws_settings();
+    $settings = get_as3cf_settings();
 
-    if (empty($settings['access_key']) || empty($settings['secret_key'])) {
+    $accessKey = $settings['access_key'];
+    $secretKey = $settings['secret_key'];
+    $bucket    = 'bucket-pbdnews'; // Sesuaikan dengan nama bucket Anda
+    $region    = 'ap-southeast-1'; // Sesuaikan dengan region bucket
+    $expires = "+1 hour";
+
+    if (empty($accessKey) || empty($secretKey)) {
+        return 'Error: AWS credentials not found.';
+    }
+
+
+    if (empty($bucket) || empty($region) || empty($accessKey) || empty($secretKey)) {
         return 'Error: AWS credentials not set.';
     }
 
     try {
         $s3 = new S3Client([
-            'version'     => 'latest',
-            'region'      => $settings['region'],
+            'version' => 'latest',
+            'region' => $region,
             'credentials' => [
-                'key'    => $settings['access_key'],
-                'secret' => $settings['secret_key']
+                'key'    => $accessKey,
+                'secret' => $secretKey
             ]
         ]);
 
         $cmd = $s3->getCommand('GetObject', [
-            'Bucket' => $settings['bucket'],
+            'Bucket' => $bucket,
             'Key'    => $file_path
         ]);
 
-        $request = $s3->createPresignedRequest($cmd, '+1 hour');
+        $request = $s3->createPresignedRequest($cmd, $expires);
         return (string) $request->getUri();
     } catch (AwsException $e) {
         return 'Error: ' . $e->getMessage();
@@ -66,10 +77,10 @@ function generate_signed_url($file_path)
 }
 
 /**
- * Ganti URL gambar di konten WordPress dengan signed URL dari S3
+ * Filter URL gambar yang mengarah ke /wp-content/uploads/
  *
  * @param string $content HTML konten yang akan diproses
- * @return string Konten dengan URL gambar yang diperbarui
+ * @return string Konten dengan URL gambar diganti dengan signed URL
  */
 function replace_image_urls_with_signed($content)
 {
@@ -79,14 +90,14 @@ function replace_image_urls_with_signed($content)
         return $content;
     }
 
-    // Regex untuk menangkap URL gambar yang berada di wp-content/uploads/
+    // Regex untuk menangkap URL gambar
     $pattern = '/(https?:\/\/' . preg_quote(parse_url($cdn_domain, PHP_URL_HOST), '/') . '\/wp-content\/uploads\/[^\s"\']+)/i';
 
     return preg_replace_callback($pattern, function ($matches) {
         $original_url = $matches[0];
 
-        // Ambil path relatif dari URL
-        $file_path = str_replace('https://assets.pbdnews.com/', '', $original_url);
+        // Ambil path file dari URL
+        $file_path = str_replace('https://assets.pbdnews.com' . '/', '', $original_url);
 
         // Buat signed URL dari S3
         $signed_url = generate_signed_url($file_path);
@@ -95,7 +106,7 @@ function replace_image_urls_with_signed($content)
     }, $content);
 }
 
-// Terapkan filter untuk mengganti URL di konten WordPress
+// Terapkan filter untuk mengganti URL di konten
 add_filter('the_content', 'replace_image_urls_with_signed');
 add_filter('post_thumbnail_html', 'replace_image_urls_with_signed');
 add_filter('widget_text', 'replace_image_urls_with_signed');
