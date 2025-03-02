@@ -139,25 +139,15 @@ function clean_query_params($url)
     return $parsed_url['scheme'] . '://' . $parsed_url['host'] . $parsed_url['path'] . '?' . $cleaned_query;
 }
 
-/**
- * Filter URL gambar yang mengarah ke /wp-content/uploads/
- *
- * @param string $content HTML konten yang akan diproses
- * @return string Konten dengan URL gambar diganti dengan signed URL
- */
-function replace_image_urls_with_signed($content)
+function replace_asset_urls_with_signed($content)
 {
-    $cdn_domain = 'https://assets.pbdnews.com';
-    $s3_domain  = 'https://bucket-pbdnews.s3.ap-southeast-1.amazonaws.com'; // Sesuaikan dengan domain S3 Anda
+    $cdn_domain = 'assets.pbdnews.com'; // Domain CDN
+    $upload_path = '/wp-content/uploads/'; // Path upload
 
-    if (empty($cdn_domain) || empty($s3_domain)) {
-        return $content;
-    }
+    // Regex untuk menangkap URL aset yang berasal dari CDN
+    $pattern = '/(https?:\/\/' . preg_quote($cdn_domain, '/') . preg_quote($upload_path, '/') . '[^\s"\']+)/i';
 
-    // Regex untuk menangkap URL gambar yang berasal dari S3 atau CDN
-    $pattern = '/(https?:\/\/(?:' . preg_quote(parse_url($s3_domain, PHP_URL_HOST), '/') . '|' . preg_quote(parse_url($cdn_domain, PHP_URL_HOST), '/') . ')(\/wp-content\/uploads\/[^\s"\']+))/i';
-
-    return preg_replace_callback($pattern, function ($matches) use ($s3_domain, $cdn_domain) {
+    return preg_replace_callback($pattern, function ($matches) {
         $original_url = $matches[0];
 
         // Pisahkan path file dari query parameters (jika ada)
@@ -174,12 +164,9 @@ function replace_image_urls_with_signed($content)
 
         // Gabungkan signed URL dengan query string asli (jika ada)
         $merged_url = merge_query_params($signed_url, $original_url);
-
-        // Bersihkan duplikasi query parameters
         return clean_query_params($merged_url);
     }, $content);
 }
-
 
 // Mulai output buffering
 function start_output_buffering()
@@ -192,9 +179,54 @@ add_action('init', 'start_output_buffering');
 function end_output_buffering()
 {
     $output = ob_get_clean(); // Ambil output yang sudah di-buffer
-    echo replace_image_urls_with_signed($output); // Proses dan kirim output
+    echo replace_asset_urls_with_signed($output); // Proses dan kirim output
 }
 add_action('shutdown', 'end_output_buffering');
+
+
+// /**
+//  * Filter URL gambar yang mengarah ke /wp-content/uploads/
+//  *
+//  * @param string $content HTML konten yang akan diproses
+//  * @return string Konten dengan URL gambar diganti dengan signed URL
+//  */
+// function replace_image_urls_with_signed($content)
+// {
+//     $cdn_domain = 'https://assets.pbdnews.com';
+//     $s3_domain  = 'https://bucket-pbdnews.s3.ap-southeast-1.amazonaws.com'; // Sesuaikan dengan domain S3 Anda
+
+//     if (empty($cdn_domain) || empty($s3_domain)) {
+//         return $content;
+//     }
+
+//     // Regex untuk menangkap URL gambar yang berasal dari S3 atau CDN
+//     $pattern = '/(https?:\/\/(?:' . preg_quote(parse_url($s3_domain, PHP_URL_HOST), '/') . '|' . preg_quote(parse_url($cdn_domain, PHP_URL_HOST), '/') . ')(\/wp-content\/uploads\/[^\s"\']+))/i';
+
+//     return preg_replace_callback($pattern, function ($matches) use ($s3_domain, $cdn_domain) {
+//         $original_url = $matches[0];
+
+//         // Pisahkan path file dari query parameters (jika ada)
+//         $url_parts = parse_url($original_url);
+//         $file_path = ltrim($url_parts['path'], '/'); // Ambil path tanpa domain
+
+//         // Buat signed URL dari S3
+//         $signed_url = generate_signed_url($file_path);
+
+//         // Jika signed URL gagal dibuat, kembalikan URL asli
+//         if (!$signed_url) {
+//             return $original_url;
+//         }
+
+//         // Gabungkan signed URL dengan query string asli (jika ada)
+//         $merged_url = merge_query_params($signed_url, $original_url);
+
+//         // Bersihkan duplikasi query parameters
+//         return clean_query_params($merged_url);
+//     }, $content);
+// }
+
+
+
 
 // // Terapkan filter untuk mengganti URL di berbagai bagian WordPress
 // add_filter('the_content', 'replace_image_urls_with_signed', 99);
