@@ -168,21 +168,15 @@ function replace_asset_urls_with_signed($content)
     }, $content);
 }
 
-// Mulai output buffering
-function start_output_buffering()
+function process_output_before_render()
 {
     ob_start();
+    add_action('shutdown', function () {
+        $output = ob_get_clean();
+        echo replace_asset_urls_with_signed($output);
+    }, 0);
 }
-add_action('init', 'start_output_buffering');
-
-// Proses output sebelum dikirim ke browser
-function end_output_buffering()
-{
-    $output = ob_get_clean(); // Ambil output yang sudah di-buffer
-    echo replace_asset_urls_with_signed($output); // Proses dan kirim output
-}
-add_action('shutdown', 'end_output_buffering');
-
+add_action('template_redirect', 'process_output_before_render');
 
 // /**
 //  * Filter URL gambar yang mengarah ke /wp-content/uploads/
