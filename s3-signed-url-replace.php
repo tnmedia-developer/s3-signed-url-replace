@@ -55,7 +55,8 @@ function generate_signed_url($file_path)
             'credentials' => [
                 'key'    => $accessKey,
                 'secret' => $secretKey
-            ]
+            ],
+            'signature_version' => 'v4', // Tambahkan signature version
         ]);
 
         $cmd = $s3->getCommand('GetObject', [
