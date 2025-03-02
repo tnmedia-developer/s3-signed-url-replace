@@ -101,13 +101,20 @@ function merge_query_params($signed_url, $original_url)
 }
 
 /**
- * Clean duplicate query parameters and remove unwanted characters like %3B
+ * Clean duplicate query parameters, replace &amp; with &, and remove %3B
  *
  * @param string $url The URL to clean
  * @return string The cleaned URL
  */
 function clean_query_params($url)
 {
+    // Replace &amp; with &
+    $url = str_replace('&amp;', '&', $url);
+
+    // Remove %3B (URL-encoded ;)
+    $url = str_replace('%3B', '', $url);
+
+    // Parse the URL to separate path and query
     $parsed_url = parse_url($url);
     if (empty($parsed_url['query'])) {
         return $url; // No query parameters, return the original URL
@@ -116,15 +123,12 @@ function clean_query_params($url)
     // Parse query parameters
     parse_str($parsed_url['query'], $query_params);
 
-    // Clean duplicate parameters and remove unwanted characters
+    // Clean duplicate parameters
     $cleaned_params = [];
     foreach ($query_params as $key => $value) {
-        // Remove %3B (;) from the key
-        $clean_key = str_replace([';', '%3B'], '', $key);
-
         // Ensure no duplicate parameters
-        if (!isset($cleaned_params[$clean_key])) {
-            $cleaned_params[$clean_key] = $value;
+        if (!isset($cleaned_params[$key])) {
+            $cleaned_params[$key] = $value;
         }
     }
 
