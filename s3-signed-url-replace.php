@@ -110,7 +110,15 @@ function replace_image_urls_with_signed($content)
 
 
 // Terapkan filter untuk mengganti URL di konten
-add_filter('the_content', 'replace_image_urls_with_signed');
-add_filter('post_thumbnail_html', 'replace_image_urls_with_signed');
-add_filter('widget_text', 'replace_image_urls_with_signed');
-add_filter('get_avatar', 'replace_image_urls_with_signed');
+// Terapkan filter untuk mengganti URL di berbagai bagian WordPress
+add_filter('the_content', 'replace_image_urls_with_signed', 99);
+add_filter('post_thumbnail_html', 'replace_image_urls_with_signed', 99);
+add_filter('widget_text', 'replace_image_urls_with_signed', 99);
+add_filter('get_avatar', 'replace_image_urls_with_signed', 99);
+add_filter('wp_get_attachment_url', 'replace_image_urls_with_signed', 99);
+add_filter('wp_get_attachment_image_src', function ($image) {
+    if (!empty($image[0])) {
+        $image[0] = replace_image_urls_with_signed($image[0]);
+    }
+    return $image;
+}, 99);
