@@ -85,26 +85,29 @@ function generate_signed_url($file_path)
 function replace_image_urls_with_signed($content)
 {
     $cdn_domain = 'https://assets.pbdnews.com';
+    $s3_domain = 'https://bucket-pbdnews.s3.ap-southeast-1.amazonaws.com'; // Sesuaikan dengan domain S3 Anda
 
-    if (empty($cdn_domain)) {
+    if (empty($cdn_domain) || empty($s3_domain)) {
         return $content;
     }
 
-    // Regex untuk menangkap URL gambar
-    $pattern = '/(https?:\/\/' . preg_quote(parse_url($cdn_domain, PHP_URL_HOST), '/') . '\/wp-content\/uploads\/[^\s"\']+)/i';
+    // Regex untuk menangkap URL gambar yang berasal dari S3 atau CDN
+    $pattern = '/(https?:\/\/(?:' . preg_quote(parse_url($s3_domain, PHP_URL_HOST), '/') . '|' . preg_quote(parse_url($cdn_domain, PHP_URL_HOST), '/') . ')(\/wp-content\/uploads\/[^\s"\']+))/i';
 
-    return preg_replace_callback($pattern, function ($matches) {
+    return preg_replace_callback($pattern, function ($matches) use ($s3_domain, $cdn_domain) {
         $original_url = $matches[0];
 
         // Ambil path file dari URL
-        $file_path = str_replace('https://assets.pbdnews.com' . '/', '', $original_url);
+        $file_path = str_replace([$s3_domain, $cdn_domain], '', $original_url);
 
         // Buat signed URL dari S3
-        $signed_url = generate_signed_url($file_path);
+        $signed_url = generate_signed_url(ltrim($file_path, '/'));
 
-        return $signed_url ?: $original_url;
+        // Ganti domain menjadi CDN
+        return str_replace($s3_domain, $cdn_domain, $signed_url);
     }, $content);
 }
+
 
 // Terapkan filter untuk mengganti URL di konten
 add_filter('the_content', 'replace_image_urls_with_signed');
