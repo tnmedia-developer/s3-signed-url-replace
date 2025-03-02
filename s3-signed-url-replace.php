@@ -181,15 +181,57 @@ function replace_image_urls_with_signed($content)
 }
 
 
-// Terapkan filter untuk mengganti URL di berbagai bagian WordPress
-add_filter('the_content', 'replace_image_urls_with_signed', 99);
-add_filter('post_thumbnail_html', 'replace_image_urls_with_signed', 99);
-add_filter('widget_text', 'replace_image_urls_with_signed', 99);
-add_filter('get_avatar', 'replace_image_urls_with_signed', 99);
-add_filter('wp_get_attachment_url', 'replace_image_urls_with_signed', 99);
-add_filter('wp_get_attachment_image_src', function ($image) {
-    if (!empty($image[0])) {
-        $image[0] = replace_image_urls_with_signed($image[0]);
-    }
-    return $image;
-}, 99);
+// Mulai output buffering
+function start_output_buffering()
+{
+    ob_start();
+}
+add_action('init', 'start_output_buffering');
+
+// Proses output sebelum dikirim ke browser
+function end_output_buffering()
+{
+    $output = ob_get_clean(); // Ambil output yang sudah di-buffer
+    echo replace_image_urls_with_signed($output); // Proses dan kirim output
+}
+add_action('shutdown', 'end_output_buffering');
+
+// // Terapkan filter untuk mengganti URL di berbagai bagian WordPress
+// add_filter('the_content', 'replace_image_urls_with_signed', 99);
+// add_filter('post_thumbnail_html', 'replace_image_urls_with_signed', 99);
+// add_filter('widget_text', 'replace_image_urls_with_signed', 99);
+// add_filter('get_avatar', 'replace_image_urls_with_signed', 99);
+// add_filter('wp_get_attachment_url', 'replace_image_urls_with_signed', 99);
+// add_filter('wp_get_attachment_image_src', function ($image) {
+//     if (!empty($image[0])) {
+//         $image[0] = replace_image_urls_with_signed($image[0]);
+//     }
+//     return $image;
+// }, 99);
+
+// // Handle srcset for responsive images
+// add_filter('wp_calculate_image_srcset', function ($sources) {
+//     foreach ($sources as $size => $source) {
+//         if (!empty($source['url'])) {
+//             $sources[$size]['url'] = replace_image_urls_with_signed($source['url']);
+//         }
+//     }
+//     return $sources;
+// }, 99);
+
+// // Handle image attributes like src, srcset, etc.
+// add_filter('wp_get_attachment_image_attributes', function ($attr) {
+//     if (!empty($attr['src'])) {
+//         $attr['src'] = replace_image_urls_with_signed($attr['src']);
+//     }
+//     if (!empty($attr['srcset'])) {
+//         $attr['srcset'] = replace_image_urls_with_signed($attr['srcset']);
+//     }
+//     return $attr;
+// }, 99);
+
+// // Handle excerpts
+// add_filter('the_excerpt', 'replace_image_urls_with_signed', 99);
+
+// // Handle post thumbnails
+// add_filter('the_post_thumbnail', 'replace_image_urls_with_signed', 99);
