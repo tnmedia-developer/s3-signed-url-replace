@@ -149,6 +149,8 @@ function replace_asset_urls_with_signed($content)
 
     return preg_replace_callback($pattern, function ($matches) {
         $original_url = $matches[0];
+        $cdn_domain = 'https://assets.pbdnews.com'; // Domain CDN
+        $bucket_domain    = 'https://bucket-pbdnews.s3.ap-southeast-1.amazonaws.com'; // Sesuaikan dengan nama bucket Anda
 
         // Pisahkan path file dari query parameters (jika ada)
         $url_parts = parse_url($original_url);
@@ -164,7 +166,9 @@ function replace_asset_urls_with_signed($content)
 
         // Gabungkan signed URL dengan query string asli (jika ada)
         $merged_url = merge_query_params($signed_url, $original_url);
-        return clean_query_params($merged_url);
+        $cdn_domain_out = str_replace($bucket_domain, $cdn_domain, $merged_url);
+
+        return clean_query_params($cdn_domain_out);
     }, $content);
 }
 
