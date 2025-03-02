@@ -11,10 +11,7 @@ if (!defined('ABSPATH')) {
     exit; // Mencegah akses langsung ke file
 }
 
-// Pastikan AWS SDK tersedia dengan Composer
-if (!class_exists('Aws\S3\S3Client')) {
-    require_once ABSPATH . 'vendor/autoload.php';
-}
+require_once __DIR__ . '/vendor/autoload.php';
 
 use Aws\S3\S3Client;
 use Aws\Exception\AwsException;
