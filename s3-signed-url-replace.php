@@ -100,43 +100,40 @@ function merge_query_params($signed_url, $original_url)
     return $parsed_signed_url['scheme'] . '://' . $parsed_signed_url['host'] . $parsed_signed_url['path'] . '?' . $query_string;
 }
 
-
 /**
- * Check if a URL is already a valid S3 signed URL
+ * Clean duplicate query parameters and remove unwanted characters like %3B
  *
- * @param string $url The URL to check
- * @return bool True if the URL is already a signed URL, false otherwise
+ * @param string $url The URL to clean
+ * @return string The cleaned URL
  */
-function is_signed_url($url)
+function clean_query_params($url)
 {
-    // Parameter kunci yang biasanya ada di signed URL S3
-    $s3_signature_params = [
-        'X-Amz-Signature',
-        'X-Amz-Algorithm',
-        'X-Amz-Credential',
-        'X-Amz-Date',
-        'X-Amz-Expires',
-        'X-Amz-SignedHeaders',
-    ];
-
     $parsed_url = parse_url($url);
     if (empty($parsed_url['query'])) {
-        return false; // Tidak ada query parameters, bukan signed URL
+        return $url; // No query parameters, return the original URL
     }
 
+    // Parse query parameters
     parse_str($parsed_url['query'], $query_params);
 
-    // Periksa apakah semua parameter kunci ada di query
-    foreach ($s3_signature_params as $param) {
-        if (!isset($query_params[$param])) {
-            return false; // Parameter kunci tidak ditemukan, bukan signed URL
+    // Clean duplicate parameters and remove unwanted characters
+    $cleaned_params = [];
+    foreach ($query_params as $key => $value) {
+        // Remove %3B (;) from the key
+        $clean_key = str_replace([';', '%3B'], '', $key);
+
+        // Ensure no duplicate parameters
+        if (!isset($cleaned_params[$clean_key])) {
+            $cleaned_params[$clean_key] = $value;
         }
     }
 
-    return true; // Semua parameter kunci ditemukan, URL sudah signed
+    // Rebuild the query string
+    $cleaned_query = http_build_query($cleaned_params);
+
+    // Rebuild the full URL
+    return $parsed_url['scheme'] . '://' . $parsed_url['host'] . $parsed_url['path'] . '?' . $cleaned_query;
 }
-
-
 
 /**
  * Filter URL gambar yang mengarah ke /wp-content/uploads/
@@ -159,11 +156,6 @@ function replace_image_urls_with_signed($content)
     return preg_replace_callback($pattern, function ($matches) use ($s3_domain, $cdn_domain) {
         $original_url = $matches[0];
 
-        // Jika URL sudah merupakan signed URL yang valid, biarkan saja
-        if (is_signed_url($original_url)) {
-            return $original_url;
-        }
-
         // Pisahkan path file dari query parameters (jika ada)
         $url_parts = parse_url($original_url);
         $file_path = ltrim($url_parts['path'], '/'); // Ambil path tanpa domain
@@ -177,9 +169,13 @@ function replace_image_urls_with_signed($content)
         }
 
         // Gabungkan signed URL dengan query string asli (jika ada)
-        return merge_query_params($signed_url, $original_url);
+        $merged_url = merge_query_params($signed_url, $original_url);
+
+        // Bersihkan duplikasi query parameters
+        return clean_query_params($merged_url);
     }, $content);
 }
+
 
 // Terapkan filter untuk mengganti URL di berbagai bagian WordPress
 add_filter('the_content', 'replace_image_urls_with_signed', 99);
