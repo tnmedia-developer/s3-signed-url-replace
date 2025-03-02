@@ -67,16 +67,37 @@ function generate_signed_url($file_path)
         $request = $s3->createPresignedRequest($cmd, $expires);
         return (string) $request->getUri();
     } catch (AwsException $e) {
+        error_log('S3 Signed URL Error: ' . $e->getMessage());
         return false;
     }
 }
 
-function remove_duplicate_query_params($url)
+/**
+ * Merge query parameters from the original URL with the signed URL
+ *
+ * @param string $signed_url The signed URL
+ * @param string $original_url The original URL
+ * @return string The merged URL
+ */
+function merge_query_params($signed_url, $original_url)
 {
-    $parsed_url = parse_url($url);
-    parse_str($parsed_url['query'], $query_params);
-    $unique_query = http_build_query(array_unique($query_params));
-    return $parsed_url['scheme'] . '://' . $parsed_url['host'] . $parsed_url['path'] . '?' . $unique_query;
+    $parsed_signed_url = parse_url($signed_url);
+    $parsed_original_url = parse_url($original_url);
+
+    $signed_query = [];
+    if (!empty($parsed_signed_url['query'])) {
+        parse_str($parsed_signed_url['query'], $signed_query);
+    }
+
+    $original_query = [];
+    if (!empty($parsed_original_url['query'])) {
+        parse_str($parsed_original_url['query'], $original_query);
+    }
+
+    $merged_query = array_merge($signed_query, $original_query);
+    $query_string = http_build_query($merged_query);
+
+    return $parsed_signed_url['scheme'] . '://' . $parsed_signed_url['host'] . $parsed_signed_url['path'] . '?' . $query_string;
 }
 
 /**
@@ -113,12 +134,7 @@ function replace_image_urls_with_signed($content)
         }
 
         // Gabungkan signed URL dengan query string asli (jika ada)
-        if (!empty($url_parts['query'])) {
-            $signed_url .= '?' . $url_parts['query'];
-        }
-
-        $fixed_url = remove_duplicate_query_params($signed_url);
-        return $fixed_url;
+        return merge_query_params($signed_url, $original_url);
     }, $content);
 }
 
