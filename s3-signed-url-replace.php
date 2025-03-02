@@ -71,6 +71,14 @@ function generate_signed_url($file_path)
     }
 }
 
+function remove_duplicate_query_params($url)
+{
+    $parsed_url = parse_url($url);
+    parse_str($parsed_url['query'], $query_params);
+    $unique_query = http_build_query(array_unique($query_params));
+    return $parsed_url['scheme'] . '://' . $parsed_url['host'] . $parsed_url['path'] . '?' . $unique_query;
+}
+
 /**
  * Filter URL gambar yang mengarah ke /wp-content/uploads/
  *
@@ -109,7 +117,8 @@ function replace_image_urls_with_signed($content)
             $signed_url .= '?' . $url_parts['query'];
         }
 
-        return $signed_url;
+        $fixed_url = remove_duplicate_query_params($signed_url);
+        return $fixed_url;
     }, $content);
 }
 
